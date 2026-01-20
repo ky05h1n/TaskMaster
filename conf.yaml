@@ -1,0 +1,10 @@
+programs:
+  sleeper1:
+    cmd: "sleep 3"
+    autorestart: true
+  sleeper2:
+    cmd: "sleep 7"
+    autorestart: false
+  quick:
+    cmd: "ls -la"
+    autorestart: true
