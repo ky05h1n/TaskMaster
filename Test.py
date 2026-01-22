@@ -12,6 +12,14 @@ CYAN = "\033[96m"
 RESET = "\033[0m"
 
 
+
+class ControlShell:
+    def __init__(self):
+        pass
+    def Start_Shell(self):
+        pass
+
+
 class TaskMaster:
     
     def __init__(self, configfile):
@@ -19,7 +27,7 @@ class TaskMaster:
         self.programs = {}
         self.pid_list = {}
 
-    def run(self, programs=None):
+    def Run(self, programs=None):
         if programs is None:
             programs = self.programs
         for prog , item in programs.items():
@@ -30,13 +38,13 @@ class TaskMaster:
             time.sleep(1)
         return self.pid_list
     
-    def load_config(self):
+    def Load_config(self):
         with open(self.configfile, 'r') as file:
             self.programs = yaml.safe_load(file)
         return self.programs['programs']
     
-    def monitor(self):
-        
+    def Monitor(self):
+        while True:
             for pid in list(self.pid_list.keys()):
                 proc, prog, item = self.pid_list[pid]
                 autorestart = item.get('autorestart')
@@ -50,14 +58,16 @@ class TaskMaster:
                     if autorestart == True:
                         print(f"{YELLOW}↻ Restarting program: {prog}{RESET}")
                         time.sleep(1)
-                        self.pid_list.update(self.run({prog: item}))
+                        self.pid_list.update(self.Run({prog: item}))
                 
                 
 if __name__ == "__main__":
     
     
     Obj = TaskMaster("conf.yaml")
-    Obj.programs = Obj.load_config()
-    Obj.pid_list.update(Obj.run())
-    while True:
-        Obj.monitor()
+    Obj.programs = Obj.Load_config()
+    Obj.pid_list.update(Obj.Run())
+    
+    Thread_Monitor = threading.Thread(target=Obj.Monitor)
+    Thread_Monitor.daemon = True
+    Thread_Monitor.start()
