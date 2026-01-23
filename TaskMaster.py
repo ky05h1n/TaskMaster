@@ -31,19 +31,34 @@ class ControlShell:
             print()
 
         def cmd_status(self):
-            
+            print()
+            print(f"{'─'*60}")
+            print(f"  {'PROGRAM':<15} {'PID':<10} {'STATUS':<12} {'CMD'}")
+            print(f"{'─'*60}")
             
             for prog in list(self.Taskmaster.programs.keys()):
                 proc, items = self.Taskmaster.programs[prog]
                 status = items.get("status")
-                if status == "RUNNING":
-                    status_msg = f"{GREEN}RUNNING{RESET}"
-                elif status == "STOPED":
-                    status_msg = f"{RED}STOPED{RESET}"
-                print(f"Program: {prog} | PID: {proc.pid} | Status: {status_msg}")
+                cmd = items.get("cmd", "N/A")
                 
-        def cmd_start(self):
-            pass
+                if status == "RUNNING":
+                    status_icon = f"{GREEN}● RUNNING{RESET}"
+                elif status == "STOPED":
+                    status_icon = f"{RED}○ STOPPED{RESET}"
+                else:
+                    status_icon = f"{YELLOW}? UNKNOWN{RESET}"
+                
+                print(f"  {prog:<15} {proc.pid:<10} {status_icon:<21} {cmd}")
+            
+            print(f"{'─'*60}")
+            print(f"  Total: {len(self.Taskmaster.programs)} program(s)")
+            print()
+                
+        def cmd_start(self, target):
+            
+    
+            subprocess.Popen(target, stdout=subprocess.DEVNULL)
+            
         def cmd_stop(self):
             pass
         def cmd_restart(self):
@@ -51,10 +66,24 @@ class ControlShell:
         def cmd_reload_config(self):
             pass
         
-        def check_program(self):
-            pass
+        def check_program(self, cmd, target):
+      
             
-        def command_loop(self):
+            if cmd == "start" or cmd == "stop" or cmd == "restart":
+                if target is None:
+                    print(f"{RED}Error: No program specified for '{cmd}' command.{RESET}")
+                    return True            
+                if target not in self.Taskmaster.programs:
+                    print(f"{RED}Error: Program '{target}' not found.{RESET}")
+                    return True
+                if  cmd == "start" and target is not None:
+                    proc, items = self.Taskmaster.programs[target]
+                    if items.get("status") == "RUNNING":
+                        print(f"{YELLOW}Program '{target}' is already running.{RESET}")
+                    return True
+                return None
+
+        def command_input(self):
             print("\n" + "="*50)
             print("Taskmaster Control Shell")
             print("="*50)
@@ -62,33 +91,37 @@ class ControlShell:
             
             while True:
                 try:
-                    input = input("taskmaster> ").strip()
-                    comands = input.split()
-                    cmd = comands[0] if len(comands) > 1 else None
+                    inpt = input("taskmaster> ").strip()
                     
-                    if cmd == "":
+                    if inpt == "":
                         continue
-                    elif cmd == "quit" or cmd == "exit":
+                    comands = inpt.split(maxsplit=1)
+                    cmd = comands[0] 
+                    target = comands[1] if len(comands) > 1 else None
+                    if self.check_program(cmd, target):
+                        continue
+                    if cmd == "quit" or cmd == "exit":
                         print(f"{YELLOW}Shutting down taskmaster...{RESET}")
                         break
 
-                    elif cmd == "help":
+                    elif cmd == "help" and target is None:
                         self.cmd_help()
                 
-                    elif cmd == "status":
+                    elif cmd == "status" and target is None:
                         self.cmd_status()
                     
+
+                    elif cmd == "reload_config" and target is None:
+                        self.cmd_reload_config()
+
                     elif cmd == "start":
-                        self.cmd_start()
+                        self.cmd_start(target)
                         
                     elif cmd == "stop":
                         self.cmd_stop()
                         
                     elif cmd == "restart":
                         self.cmd_restart()
-                        
-                    elif cmd == "reload_config":
-                        self.cmd_reload_config()
                 
                     else:
                         print(f"{RED}Unknown command: '{cmd}'{RESET}")
@@ -110,7 +143,7 @@ class TaskMaster:
         def log_info(self, message, prog=None, pid=None):
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # Symbols only (no colors for clean log file)
+            
             if message == "Started":
                 symbol = "▶"
             elif message == "Terminated":
@@ -132,12 +165,39 @@ class TaskMaster:
         def Run(self, programs=None):
             if programs is None:
                 programs = self.configdata
-            for prog , item in programs.items():
+                print()
+                print(f"{CYAN}{'═'*60}{RESET}")
+                print(f"{CYAN}  ▶ TASKMASTER - Starting Programs{RESET}")
+                print(f"{CYAN}{'═'*60}{RESET}")
+                print()
+                time.sleep(0.5)
+                print(f"  {'PROGRAM':<15} {'STATUS':<20} {'PID'}")
+                print(f"  {'─'*50}")
+                time.sleep(0.3)
+            
+            for prog, item in programs.items():
                 cmd = item.get('cmd')
+                
+                if programs == self.configdata:
+                    print(f"  {prog:<15} {YELLOW}◌ Loading...{RESET}", end='\r')
+                    time.sleep(0.4)
+                
                 proc = subprocess.Popen(cmd.split(), stdout=subprocess.DEVNULL)
                 item["status"] = "RUNNING"
                 self.programs[prog] = (proc, item)
                 self.log_info("Started", prog, proc.pid)
+                
+                if programs == self.configdata:
+                    print(f"  {prog:<15} {GREEN}● Started{RESET}            {proc.pid}")
+                    time.sleep(0.3)
+            
+            if programs == self.configdata:
+                time.sleep(0.3)
+                print(f"  {'─'*50}")
+                time.sleep(0.2)
+                print(f"  {GREEN}✓ {len(self.programs)} program(s) started successfully{RESET}")
+                print()
+            
             return self.programs
         
         def Load_config(self):
@@ -172,5 +232,5 @@ if __name__ == "__main__":
     Thread_Monitor.start()
     
     Ctl = ControlShell(Obj)
-    Ctl.command_loop()
+    Ctl.command_input()
     
