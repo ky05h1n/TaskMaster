@@ -1,11 +1,12 @@
 programs:
   sleeper1:
-    cmd: "sleep 10"
+    cmd: "sleep 20"
     autorestart: true
     autostart: true
   sleeper2:
-    cmd: "sleep 7"
+    cmd: "sleep 20"
     autorestart: false
   quick:
     cmd: "ls -la"
     autorestart: false
+    

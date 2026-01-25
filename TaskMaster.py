@@ -46,13 +46,13 @@ class ControlShell:
 
                 cmd = items.get("cmd", "N/A")
                 if status == "CREATED":
-                    status_icon = f"{YELLOW}▪ STOPPED{RESET}"
+                    status_icon = f"{RED}▪ STOPPED{RESET}"
                     print(f"  {prog:<15} {'-':<10} {status_icon:<21} {cmd}")
                 else:
                     if status == "STARTED":
                         status_icon = f"{GREEN}● RUNNING{RESET}"
                     elif status == "STOPPED":
-                        status_icon = f"{RED}○ STOPPED{RESET}"
+                        status_icon = f"{RED}▪ STOPPED{RESET}"
                     print(f"  {prog:<15} {proc.pid:<10} {status_icon:<21} {cmd}")
             
             print(f"{'─'*60}")
@@ -67,12 +67,19 @@ class ControlShell:
             print(f"{GREEN}Program '{target}' started successfully.{RESET}")
             items["sig"] = None
             
-        def cmd_stop(self):
-            pass
+        def cmd_stop(self, target):
+            proc, items = self.Taskmaster.programs[target]
+            proc.terminate()
+            items["status"] = "STOPPED"
+            self.Taskmaster.log_info("Stopped", target, proc.pid)
+            print(f"{RED}Program '{target}' stopped successfully.{RESET}")
+            
         def cmd_restart(self):
             pass
         def cmd_reload_config(self):
-            pass
+            self.Taskmaster.Load_config()
+            self.Taskmaster.Run(self.Taskmaster.configdata)
+            print(f"{GREEN}Configuration reloaded successfully.{RESET}")
         
         def check_program(self, cmd, target):
       
@@ -84,10 +91,15 @@ class ControlShell:
                 if target not in self.Taskmaster.programs:
                     print(f"{RED}Error: Program '{target}' not found.{RESET}")
                     return True
-                if  cmd == "start" and target is not None:
+                if  cmd == "start":
                     proc, items = self.Taskmaster.programs[target]
                     if items.get("status") == "STARTED":
                         print(f"{YELLOW}Program '{target}' is already running.{RESET}")
+                        return True
+                if cmd == "stop":
+                    proc, items = self.Taskmaster.programs[target]
+                    if items.get('status') != "STARTED":
+                        print(f"{YELLOW}Program '{target}' is not running.{RESET}")
                         return True
                 return None
 
@@ -119,14 +131,14 @@ class ControlShell:
                         self.cmd_status()
                     
 
-                    elif cmd == "reload_config" and target is None:
+                    elif cmd == "reload" and target is None:
                         self.cmd_reload_config()
 
                     elif cmd == "start":
                         self.cmd_start(target)
                         
                     elif cmd == "stop":
-                        self.cmd_stop()
+                        self.cmd_stop(target)
                         
                     elif cmd == "restart":
                         self.cmd_restart()
