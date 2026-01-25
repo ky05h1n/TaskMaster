@@ -2,6 +2,7 @@ programs:
   sleeper1:
     cmd: "sleep 10"
     autorestart: true
+    autostart: true
   sleeper2:
     cmd: "sleep 7"
     autorestart: false

@@ -5,6 +5,7 @@ import readline
 import threading
 from datetime import datetime
 
+LOGFILE = "logs.log"
 CONFILE = "conf.yaml"
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -31,6 +32,9 @@ class ControlShell:
             print()
 
         def cmd_status(self):
+            
+            
+            
             print()
             print(f"{'─'*60}")
             print(f"  {'PROGRAM':<15} {'PID':<10} {'STATUS':<12} {'CMD'}")
@@ -39,16 +43,17 @@ class ControlShell:
             for prog in list(self.Taskmaster.programs.keys()):
                 proc, items = self.Taskmaster.programs[prog]
                 status = items.get("status")
+
                 cmd = items.get("cmd", "N/A")
-                
-                if status == "RUNNING":
-                    status_icon = f"{GREEN}● RUNNING{RESET}"
-                elif status == "STOPED":
-                    status_icon = f"{RED}○ STOPPED{RESET}"
+                if status == "CREATED":
+                    status_icon = f"{YELLOW}▪ STOPPED{RESET}"
+                    print(f"  {prog:<15} {'-':<10} {status_icon:<21} {cmd}")
                 else:
-                    status_icon = f"{YELLOW}? UNKNOWN{RESET}"
-                
-                print(f"  {prog:<15} {proc.pid:<10} {status_icon:<21} {cmd}")
+                    if status == "STARTED":
+                        status_icon = f"{GREEN}● RUNNING{RESET}"
+                    elif status == "STOPPED":
+                        status_icon = f"{RED}○ STOPPED{RESET}"
+                    print(f"  {prog:<15} {proc.pid:<10} {status_icon:<21} {cmd}")
             
             print(f"{'─'*60}")
             print(f"  Total: {len(self.Taskmaster.programs)} program(s)")
@@ -56,8 +61,11 @@ class ControlShell:
                 
         def cmd_start(self, target):
             
-    
-            subprocess.Popen(target, stdout=subprocess.DEVNULL)
+            proc, items = self.Taskmaster.programs[target]
+            items["sig"] = "START"
+            self.Taskmaster.Run({target: items})
+            print(f"{GREEN}Program '{target}' started successfully.{RESET}")
+            items["sig"] = None
             
         def cmd_stop(self):
             pass
@@ -78,9 +86,9 @@ class ControlShell:
                     return True
                 if  cmd == "start" and target is not None:
                     proc, items = self.Taskmaster.programs[target]
-                    if items.get("status") == "RUNNING":
+                    if items.get("status") == "STARTED":
                         print(f"{YELLOW}Program '{target}' is already running.{RESET}")
-                    return True
+                        return True
                 return None
 
         def command_input(self):
@@ -146,21 +154,19 @@ class TaskMaster:
             
             if message == "Started":
                 symbol = "▶"
-            elif message == "Terminated":
-                symbol = "✖"
+            elif message == "Stopped":
+                symbol = "▪"
             elif message == "Restarting":
                 symbol = "↻"
-            else:
-                symbol = "▪"
             
             if prog and pid:
                 log_line = f"{symbol} [{timestamp}] [{prog}] [PID:{pid}] {message}"
             elif prog:
                 log_line = f"{symbol} [{timestamp}] [{prog}] {message}"
-            else:
-                log_line = f"{symbol} [{timestamp}] {message}"
-            with open("logs.log", "a") as log_file:
-                log_file.write(f"{log_line}\n")                
+
+            with open(LOGFILE, "a") as log_file:
+                log_file.write(f"{log_line}\n")
+                time.sleep(0.5)       
 
         def Run(self, programs=None):
             if programs is None:
@@ -177,45 +183,56 @@ class TaskMaster:
             
             for prog, item in programs.items():
                 cmd = item.get('cmd')
-                
                 if programs == self.configdata:
+                    item["status"] = "CREATED"
                     print(f"  {prog:<15} {YELLOW}◌ Loading...{RESET}", end='\r')
                     time.sleep(0.4)
-                
-                proc = subprocess.Popen(cmd.split(), stdout=subprocess.DEVNULL)
-                item["status"] = "RUNNING"
-                self.programs[prog] = (proc, item)
-                self.log_info("Started", prog, proc.pid)
-                
-                if programs == self.configdata:
-                    print(f"  {prog:<15} {GREEN}● Started{RESET}            {proc.pid}")
-                    time.sleep(0.3)
-            
+                    
+                if item.get('autostart') or item.get('sig') == "START":
+                    proc = subprocess.Popen(cmd.split(), stdout=subprocess.DEVNULL)
+                    item["status"] = "STARTED"
+                    self.programs[prog] = (proc, item)
+                    self.log_info("Started", prog, proc.pid)
+                    if programs == self.configdata:
+                        print(f"  {prog:<15} {GREEN}● Started{RESET}            {proc.pid}")
+                        time.sleep(0.3)
+                if item.get('status') == "CREATED":
+                    proc = None
+                    self.programs[prog] = (proc, item)
+    
             if programs == self.configdata:
                 time.sleep(0.3)
                 print(f"  {'─'*50}")
                 time.sleep(0.2)
-                print(f"  {GREEN}✓ {len(self.programs)} program(s) started successfully{RESET}")
-                print()
+                if prog is None:
+                    print(f"  {GREEN}✓ {len(self.programs)} program(s) started successfully{RESET}")
+                    print()
+                else:
+                    print(f"  {GREEN}✓ {len(self.programs)} program(s) loaded {RESET}")
+                    print()
+                
             
             return self.programs
         
         def Load_config(self):
             with open(self.configfile, 'r') as file:
                 data = yaml.safe_load(file)
+            with open(LOGFILE, 'w') as logfile:
+                logfile.write("")
             self.configdata = data['programs']
         
         def Monitor(self):
             while True:
                 for prog in list(self.programs.keys()):
                     proc, item = self.programs[prog]
-                    autorestart = item.get('autorestart')
+                    if item.get("status") == "CREATED" or item.get("status") == "STOPPED":
+                        continue
                     if proc.poll() is None:
                         continue
                     else:
-                        self.log_info("Terminated", prog, proc.pid)
-                        item ["status"] = "STOPED"
-                        if autorestart == True:
+                        self.log_info("Stopped", prog, proc.pid)
+                        item ["status"] = "STOPPED"
+                        if item.get("autorestart"):
                             self.log_info("Restarting", prog)
                             self.Run({prog: item})
                 time.sleep(1)
