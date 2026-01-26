@@ -1,12 +1,9 @@
-▶ [2026-01-25 17:47:19] [sleeper1] [PID:24018] Started
-▶ [2026-01-25 17:47:21] [quick] [PID:24037] Started
-▪ [2026-01-25 17:47:21] [quick] [PID:24037] Stopped
-▪ [2026-01-25 17:47:40] [sleeper1] [PID:24018] Stopped
-↻ [2026-01-25 17:47:40] [sleeper1] Restarting
-▶ [2026-01-25 17:47:41] [sleeper1] [PID:24118] Started
-▪ [2026-01-25 17:48:02] [sleeper1] [PID:24118] Stopped
-↻ [2026-01-25 17:48:02] [sleeper1] Restarting
-▶ [2026-01-25 17:48:03] [sleeper1] [PID:24130] Started
-▪ [2026-01-25 17:48:23] [sleeper1] [PID:24130] Stopped
-↻ [2026-01-25 17:48:24] [sleeper1] Restarting
-▶ [2026-01-25 17:48:24] [sleeper1] [PID:24145] Started
+▶ [2026-01-26 14:15:41] [sleeper1] [PID:16750] Started
+↻ [2026-01-26 14:15:51] Configuration Reloaded
+▪ [2026-01-26 14:16:03] [sleeper1] [PID:16750] Stopped
+↻ [2026-01-26 14:16:04] [sleeper1] Restarting
+▶ [2026-01-26 14:16:04] [sleeper1] [PID:16845] Started
+↻ [2026-01-26 14:16:09] Configuration Reloaded
+▪ [2026-01-26 14:16:25] [sleeper1] [PID:16845] Stopped
+↻ [2026-01-26 14:16:25] [sleeper1] Restarting
+▶ [2026-01-26 14:16:26] [sleeper1] [PID:16933] Started

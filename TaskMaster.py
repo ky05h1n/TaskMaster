@@ -76,10 +76,41 @@ class ControlShell:
             
         def cmd_restart(self):
             pass
+        
         def cmd_reload_config(self):
-            self.Taskmaster.Load_config()
-            self.Taskmaster.Run(self.Taskmaster.configdata)
-            print(f"{GREEN}Configuration reloaded successfully.{RESET}")
+            sig = False
+            new_conf = self.Taskmaster.Load_config("reload")
+            for prog_new , items_new in new_conf.items():
+                if prog_new not in self.Taskmaster.programs:
+                    items_new['status'] = "CREATED"
+                    items_new['sig'] = None
+                    self.Taskmaster.programs[prog_new] = (None, items_new)
+                    print(f"{GREEN}Configuration reloaded successfully.{RESET}")
+                    sig = True
+                elif prog_new in self.Taskmaster.programs:
+                    proc , items = self.Taskmaster.programs[prog_new]
+                    save = items.pop('status', (None))
+                    items.pop('sig', (None))
+                    items_new.pop('status', (None))
+                    items_new.pop('sig', (None))
+                    if items_new != items:
+                        items_new['status'] = "CREATED"
+                        items_new['sig'] = None
+                        if proc is not None:
+                            proc.terminate()
+                        proc = None
+                        self.Taskmaster.programs[prog_new] = (proc, items_new)
+                        print(f"{GREEN}Configuration reloaded successfully.{RESET}")
+                        self.Taskmaster.Run({prog_new: items_new})
+                        sig = True
+                    else:
+                        items['status'] = save
+                        items['sig'] = None
+                        self.Taskmaster.programs[prog_new] = (proc, items)                 
+            if not sig:
+                print(f"{GREEN}Configuration reloaded, Nothing Changed!{RESET}")
+            self.Taskmaster.log_info("Configuration Reloaded")
+            
         
         def check_program(self, cmd, target):
       
@@ -175,7 +206,9 @@ class TaskMaster:
                 log_line = f"{symbol} [{timestamp}] [{prog}] [PID:{pid}] {message}"
             elif prog:
                 log_line = f"{symbol} [{timestamp}] [{prog}] {message}"
-
+            else:
+                symbol = "↻"
+                log_line = f"{symbol} [{timestamp}] {message}"
             with open(LOGFILE, "a") as log_file:
                 log_file.write(f"{log_line}\n")
                 time.sleep(0.5)       
@@ -226,17 +259,22 @@ class TaskMaster:
             
             return self.programs
         
-        def Load_config(self):
-            with open(self.configfile, 'r') as file:
-                data = yaml.safe_load(file)
-            with open(LOGFILE, 'w') as logfile:
-                logfile.write("")
-            self.configdata = data['programs']
-        
+        def Load_config(self, state=None):
+            
+                with open(self.configfile, 'r') as file:
+                    data = yaml.safe_load(file)
+                if state == "reload":
+                    return data['programs']
+                else:
+                    self.configdata = data['programs']
+                
+      
         def Monitor(self):
+
             while True:
                 for prog in list(self.programs.keys()):
                     proc, item = self.programs[prog]
+                    
                     if item.get("status") == "CREATED" or item.get("status") == "STOPPED":
                         continue
                     if proc.poll() is None:
@@ -247,11 +285,12 @@ class TaskMaster:
                         if item.get("autorestart"):
                             self.log_info("Restarting", prog)
                             self.Run({prog: item})
-                time.sleep(1)
+                time.sleep(5)
                 
 if __name__ == "__main__":
     
-    
+    with open(LOGFILE, 'w') as logfile:
+                logfile.write("")
     Obj = TaskMaster(CONFILE)
     Obj.Load_config()
     Obj.Run()
