@@ -2,15 +2,54 @@
 
 A lightweight process manager for Linux, similar to Supervisord. TaskMaster allows you to manage, monitor, and control multiple processes from a simple command-line interface.
 
-## Features
+> ⚠️ **Work in Progress** - This project is under active development.
 
-- **Process Management**: Start, stop, and restart programs
-- **Auto-start**: Automatically start programs on launch
-- **Auto-restart**: Automatically restart programs when they exit
-- **Live Monitoring**: Background thread monitors process status
-- **Configuration Reload**: Hot-reload configuration without restarting TaskMaster
-- **Logging**: All events logged to `logs.log`
-- **Interactive Shell**: User-friendly command interface with colored output
+## Project Status
+
+### ✅ Implemented
+
+- [x] Start jobs as child processes
+- [x] Monitor process status (alive/dead)
+- [x] YAML configuration file
+- [x] Logging system to local file
+- [x] Interactive control shell with readline (line editing, history)
+- [x] `status` command - view all programs
+- [x] `start <program>` command
+- [x] `stop <program>` command
+- [x] `reload` command - hot reload configuration
+- [x] `quit/exit` command
+- [x] `autostart` - start program on launch
+- [x] `autorestart` - restart on exit (basic)
+- [x] Detect new/changed/removed programs on reload
+
+### 🔄 In Progress
+
+- [ ] `restart <program>` command
+- [ ] Handle removed programs on reload (stop & remove)
+
+### ❌ TODO
+
+**Configuration Options:**
+- [ ] `numprocs` - number of processes to start and keep running
+- [ ] `autorestart: unexpected` - restart only on unexpected exits
+- [ ] `exitcodes` - expected exit status codes
+- [ ] `starttime` - time before considered "successfully started"
+- [ ] `startretries` - max restart attempts before aborting
+- [ ] `stopsignal` - signal to use for graceful stop (TERM, HUP, INT, etc.)
+- [ ] `stoptime` - grace period before SIGKILL
+- [ ] `stdout/stderr` - redirect to files (currently discarded)
+- [ ] `env` - environment variables
+- [ ] `workingdir` - working directory
+- [ ] `umask` - file creation mask
+
+**Features:**
+- [ ] SIGHUP signal to reload configuration
+- [ ] Proper signal handling (SIGTERM, SIGKILL for stop)
+
+**Bonus Ideas:**
+- [ ] Client/server architecture (daemon + control program)
+- [ ] Email/HTTP alerts
+- [ ] Attach/detach to process console (like tmux)
 
 ## Installation
 
@@ -39,11 +78,49 @@ programs:
 
 ### Configuration Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `cmd` | string | Command to execute |
-| `autostart` | boolean | Start program automatically on TaskMaster launch |
-| `autorestart` | boolean | Restart program automatically when it exits |
+### Current Configuration Options
+
+| Option | Type | Description | Status |
+|--------|------|-------------|--------|
+| `cmd` | string | Command to execute | ✅ |
+| `autostart` | boolean | Start program on launch | ✅ |
+| `autorestart` | boolean | Restart when exits | ✅ |
+| `numprocs` | integer | Number of instances | ❌ |
+| `exitcodes` | list | Expected exit codes | ❌ |
+| `starttime` | integer | Seconds before "started" | ❌ |
+| `startretries` | integer | Max restart attempts | ❌ |
+| `stopsignal` | string | Signal for graceful stop | ❌ |
+| `stoptime` | integer | Grace period before KILL | ❌ |
+| `stdout` | string | Redirect stdout to file | ❌ |
+| `stderr` | string | Redirect stderr to file | ❌ |
+| `env` | dict | Environment variables | ❌ |
+| `workingdir` | string | Working directory | ❌ |
+| `umask` | string | File creation mask | ❌ |
+
+### Target Configuration (from PDF)
+
+```yaml
+programs:
+  nginx:
+    cmd: "/usr/local/bin/nginx -c /etc/nginx/test.conf"
+    numprocs: 1
+    umask: 022
+    workingdir: /tmp
+    autostart: true
+    autorestart: unexpected
+    exitcodes:
+      - 0
+      - 2
+    startretries: 3
+    starttime: 5
+    stopsignal: TERM
+    stoptime: 10
+    stdout: /tmp/nginx.stdout
+    stderr: /tmp/nginx.stderr
+    env:
+      STARTED_BY: taskmaster
+      ANSWER: 42
+```
 
 ## Usage
 
