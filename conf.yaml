@@ -4,7 +4,7 @@ programs:
     autorestart: true
     autostart: true
   sleeper2:
-    cmd: "sleep 20"
+    cmd: "gnome-terminal"
     autorestart: false
   quick:
     cmd: "ls -la"

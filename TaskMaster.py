@@ -51,9 +51,11 @@ class ControlShell:
                 else:
                     if status == "STARTED":
                         status_icon = f"{GREEN}● RUNNING{RESET}"
+                        print(f"  {prog:<15} {proc.pid:<10} {status_icon:<21} {cmd}")
+
                     elif status == "STOPPED":
                         status_icon = f"{RED}▪ STOPPED{RESET}"
-                    print(f"  {prog:<15} {proc.pid:<10} {status_icon:<21} {cmd}")
+                        print(f"  {prog:<15} {proc.pid:<10} {status_icon:<21} {cmd}")
             
             print(f"{'─'*60}")
             print(f"  Total: {len(self.Taskmaster.programs)} program(s)")
@@ -74,8 +76,13 @@ class ControlShell:
             self.Taskmaster.log_info("Stopped", target, proc.pid)
             print(f"{RED}Program '{target}' stopped successfully.{RESET}")
             
-        def cmd_restart(self):
-            pass
+        def cmd_restart(self, target):
+            
+            self.cmd_stop(target)
+            time.sleep(1)
+            self.cmd_start(target)
+            print(f"{GREEN}Program '{target}' restarted successfully.{RESET}")
+            self.Taskmaster.log_info("Restarted", target)
         
         def cmd_reload_config(self):
             sig = False
@@ -106,7 +113,15 @@ class ControlShell:
                     else:
                         items['status'] = save
                         items['sig'] = None
-                        self.Taskmaster.programs[prog_new] = (proc, items)                 
+                        self.Taskmaster.programs[prog_new] = (proc, items)
+            for prog in list(self.Taskmaster.programs.keys()):
+                if prog not in new_conf:
+                    proc , items = self.Taskmaster.programs[prog]
+                    if proc is not None:
+                        proc.terminate()
+                    self.Taskmaster.programs.pop(prog)
+                    print(f"{GREEN}Configuration reloaded successfully.{RESET}")
+                    sig = True
             if not sig:
                 print(f"{GREEN}Configuration reloaded, Nothing Changed!{RESET}")
             self.Taskmaster.log_info("Configuration Reloaded")
@@ -125,12 +140,12 @@ class ControlShell:
                 if  cmd == "start":
                     proc, items = self.Taskmaster.programs[target]
                     if items.get("status") == "STARTED":
-                        print(f"{YELLOW}Program '{target}' is already running.{RESET}")
+                        print(f"{GREEN}Program '{target}' is already running.{RESET}")
                         return True
-                if cmd == "stop":
+                if cmd == "stop" or cmd == "restart":
                     proc, items = self.Taskmaster.programs[target]
                     if items.get('status') != "STARTED":
-                        print(f"{YELLOW}Program '{target}' is not running.{RESET}")
+                        print(f"{RED}Program '{target}' is not running.{RESET}")
                         return True
                 return None
 
@@ -172,7 +187,7 @@ class ControlShell:
                         self.cmd_stop(target)
                         
                     elif cmd == "restart":
-                        self.cmd_restart()
+                        self.cmd_restart(target)
                 
                     else:
                         print(f"{RED}Unknown command: '{cmd}'{RESET}")
@@ -199,9 +214,8 @@ class TaskMaster:
                 symbol = "▶"
             elif message == "Stopped":
                 symbol = "▪"
-            elif message == "Restarting":
+            elif message == "Restarting" or message == "Restarted":
                 symbol = "↻"
-            
             if prog and pid:
                 log_line = f"{symbol} [{timestamp}] [{prog}] [PID:{pid}] {message}"
             elif prog:
