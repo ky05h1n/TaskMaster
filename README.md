@@ -16,16 +16,15 @@ A lightweight process manager for Linux, similar to Supervisord. TaskMaster allo
 - [x] `status` command - view all programs
 - [x] `start <program>` command
 - [x] `stop <program>` command
+- [x] `restart <program>` command (with 1s delay between stop/start)
 - [x] `reload` command - hot reload configuration
 - [x] `quit/exit` command
 - [x] `autostart` - start program on launch
 - [x] `autorestart` - restart on exit (basic)
 - [x] Detect new/changed/removed programs on reload
+- [x] Handle removed programs on reload (stop & remove)
 
 ### 🔄 In Progress
-
-- [ ] `restart <program>` command
-- [ ] Handle removed programs on reload (stop & remove)
 
 ### ❌ TODO
 
