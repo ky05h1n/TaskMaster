@@ -46,8 +46,9 @@ A lightweight process manager for Linux, similar to Supervisord. TaskMaster allo
 - [ ] Proper signal handling (SIGTERM, SIGKILL for stop)
 
 **Bonus Ideas:**
-- [ ] Client/server architecture (daemon + control program)
-- [ ] Email/HTTP alerts
+- [x] Client/server architecture (daemon + control program)
+- [x] Privilege de-escalation on launch (requires root on Unix)
+- [x] Email/HTTP/Syslog alerts (advanced logging)
 - [ ] Attach/detach to process console (like tmux)
 
 ## Installation
@@ -95,6 +96,9 @@ programs:
 | `env` | dict | Environment variables | ❌ |
 | `workingdir` | string | Working directory | ❌ |
 | `umask` | string | File creation mask | ❌ |
+| `user` | string | Run as user (Unix only) | ✅ (bonus) |
+| `group` | string | Run as group (Unix only) | ✅ (bonus) |
+| `alerts` | dict | Advanced logging/alerts | ✅ (bonus) |
 
 ### Target Configuration (from PDF)
 
@@ -102,6 +106,8 @@ programs:
 programs:
   nginx:
     cmd: "/usr/local/bin/nginx -c /etc/nginx/test.conf"
+    user: nobody
+    group: nogroup
     numprocs: 1
     umask: 022
     workingdir: /tmp
@@ -119,6 +125,30 @@ programs:
     env:
       STARTED_BY: taskmaster
       ANSWER: 42
+alerts:
+  email:
+    enabled: false
+    smtp_host: "smtp.example.com"
+    smtp_port: 587
+    username: "user@example.com"
+    password: "app-password"
+    from: "taskmaster@example.com"
+    to:
+      - "ops@example.com"
+    subject: "TaskMaster Alert"
+    use_tls: true
+  http:
+    enabled: false
+    url: "https://hooks.example.com/taskmaster"
+    method: "POST"
+    headers:
+      Authorization: "Bearer TOKEN"
+    timeout: 5
+  syslog:
+    enabled: false
+    address: "localhost"
+    port: 514
+    facility: "user"
 ```
 
 ## Usage
@@ -127,6 +157,20 @@ Start TaskMaster:
 
 ```bash
 python3 TaskMaster.py
+```
+
+### Bonus: Client/Server Mode
+
+Run the daemon server (job control):
+
+```bash
+python3 bonus/server.py
+```
+
+In another terminal, run the client control shell:
+
+```bash
+python3 bonus/client.py
 ```
 
 ### Available Commands
@@ -196,6 +240,10 @@ Events are logged to `logs.log`:
 ```
 TaskMaster/
 ├── TaskMaster.py    # Main application
+├── bonus/
+│   ├── server.py     # Bonus daemon server
+│   ├── client.py     # Bonus control shell client
+│   └── __init__.py
 ├── conf.yaml        # Configuration file
 ├── logs.log         # Log file
 └── README.md        # This file

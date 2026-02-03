@@ -1,8 +1,15 @@
 import subprocess
 import yaml
 import time
-import readline
+# import readline
 import threading
+import os
+import json
+import logging
+from logging.handlers import SysLogHandler
+import smtplib
+from email.message import EmailMessage
+import urllib.request
 from datetime import datetime
 
 LOGFILE = "logs.log"
@@ -205,6 +212,7 @@ class TaskMaster:
             self.configdata = {}
             self.programs = {}
             self.logfie = {}
+            self.alerts = {}
             
         def log_info(self, message, prog=None, pid=None):
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -223,9 +231,10 @@ class TaskMaster:
             else:
                 symbol = "↻"
                 log_line = f"{symbol} [{timestamp}] {message}"
-            with open(LOGFILE, "a") as log_file:
+            with open(LOGFILE, "a", encoding="utf-8") as log_file:
                 log_file.write(f"{log_line}\n")
                 time.sleep(0.5)       
+            self._send_alerts(log_line)
 
         def Run(self, programs=None):
             if programs is None:
@@ -248,7 +257,12 @@ class TaskMaster:
                     time.sleep(0.4)
                     
                 if item.get('autostart') or item.get('sig') == "START":
-                    proc = subprocess.Popen(cmd.split(), stdout=subprocess.DEVNULL)
+                    preexec_fn = self._build_preexec_fn(item)
+                    proc = subprocess.Popen(
+                        cmd.split(),
+                        stdout=subprocess.DEVNULL,
+                        preexec_fn=preexec_fn
+                    )
                     item["status"] = "STARTED"
                     self.programs[prog] = (proc, item)
                     self.log_info("Started", prog, proc.pid)
@@ -281,6 +295,7 @@ class TaskMaster:
                     return data['programs']
                 else:
                     self.configdata = data['programs']
+                    self.alerts = data.get('alerts', {}) or {}
                 
       
         def Monitor(self):
@@ -300,10 +315,111 @@ class TaskMaster:
                             self.log_info("Restarting", prog)
                             self.Run({prog: item})
                 time.sleep(5)
+
+        def _send_alerts(self, log_line: str) -> None:
+            alerts = self.alerts or {}
+            if not alerts:
+                return
+
+            self._send_email_alert(alerts.get("email"), log_line)
+            self._send_http_alert(alerts.get("http"), log_line)
+            self._send_syslog_alert(alerts.get("syslog"), log_line)
+
+        def _send_email_alert(self, cfg, log_line: str) -> None:
+            if not cfg or not cfg.get("enabled"):
+                return
+            try:
+                host = cfg.get("smtp_host")
+                port = int(cfg.get("smtp_port", 587))
+                username = cfg.get("username")
+                password = cfg.get("password")
+                sender = cfg.get("from")
+                recipients = cfg.get("to")
+                if isinstance(recipients, str):
+                    recipients = [recipients]
+                subject = cfg.get("subject", "TaskMaster Alert")
+                use_tls = cfg.get("use_tls", True)
+
+                if not host or not sender or not recipients:
+                    return
+
+                msg = EmailMessage()
+                msg["Subject"] = subject
+                msg["From"] = sender
+                msg["To"] = ", ".join(recipients)
+                msg.set_content(log_line)
+
+                with smtplib.SMTP(host, port, timeout=10) as smtp:
+                    if use_tls:
+                        smtp.starttls()
+                    if username and password:
+                        smtp.login(username, password)
+                    smtp.send_message(msg)
+            except Exception:
+                return
+
+        def _send_http_alert(self, cfg, log_line: str) -> None:
+            if not cfg or not cfg.get("enabled"):
+                return
+            try:
+                url = cfg.get("url")
+                if not url:
+                    return
+                method = cfg.get("method", "POST").upper()
+                headers = cfg.get("headers", {}) or {}
+                timeout = float(cfg.get("timeout", 5))
+
+                payload = {"message": log_line}
+                data = json.dumps(payload).encode("utf-8")
+                headers.setdefault("Content-Type", "application/json")
+
+                req = urllib.request.Request(url, data=data, headers=headers, method=method)
+                with urllib.request.urlopen(req, timeout=timeout):
+                    pass
+            except Exception:
+                return
+
+        def _send_syslog_alert(self, cfg, log_line: str) -> None:
+            if not cfg or not cfg.get("enabled"):
+                return
+            try:
+                address = cfg.get("address", "localhost")
+                port = int(cfg.get("port", 514))
+                facility = cfg.get("facility", "user")
+                logger = logging.getLogger("taskmaster_syslog")
+                if not any(isinstance(h, SysLogHandler) for h in logger.handlers):
+                    handler = SysLogHandler(address=(address, port), facility=facility)
+                    formatter = logging.Formatter("%(message)s")
+                    handler.setFormatter(formatter)
+                    logger.addHandler(handler)
+                    logger.setLevel(logging.INFO)
+                logger.info(log_line)
+            except Exception:
+                return
+
+        def _build_preexec_fn(self, item):
+            user = item.get("user")
+            group = item.get("group")
+            if not user and not group:
+                return None
+            if os.name == "nt":
+                return None
+
+            def _preexec():
+                if group:
+                    import grp
+                    gid = grp.getgrnam(group).gr_gid
+                    os.setgid(gid)
+                if user:
+                    import pwd
+                    uid = pwd.getpwnam(user).pw_uid
+                    os.setuid(uid)
+
+            return _preexec
                 
 if __name__ == "__main__":
     
-    with open(LOGFILE, 'w') as logfile:
+    with open(LOGFILE, "w", encoding="utf-8") as logfile:
                 logfile.write("")
     Obj = TaskMaster(CONFILE)
     Obj.Load_config()
