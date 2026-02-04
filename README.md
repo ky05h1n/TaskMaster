@@ -113,8 +113,6 @@ programs:
     stoptime: 5
     stdout: "/tmp/taskmaster.scheduler.out"
     stderr: "/tmp/taskmaster.scheduler.err"
-    env:
-      SCHEDULE: "*/5 * * * *"
     workingdir: "/tmp"
     umask: "022"
 ```
