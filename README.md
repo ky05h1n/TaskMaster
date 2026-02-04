@@ -20,7 +20,7 @@ A lightweight process manager for Linux, similar to Supervisord. TaskMaster allo
 - [x] `reload` command - hot reload configuration
 - [x] `quit/exit` command
 - [x] `autostart` - start program on launch
-- [x] `autorestart` - restart on exit (basic)
+- [x] `autorestart` - restart on exit (`true` or `unexpected`)
 - [x] Detect new/changed/removed programs on reload
 - [x] Handle removed programs on reload (stop & remove)
 
@@ -28,27 +28,29 @@ A lightweight process manager for Linux, similar to Supervisord. TaskMaster allo
 
 ### ❌ TODO
 
-**Configuration Options:**
-- [ ] `numprocs` - number of processes to start and keep running
-- [ ] `autorestart: unexpected` - restart only on unexpected exits
-- [ ] `exitcodes` - expected exit status codes
-- [ ] `starttime` - time before considered "successfully started"
-- [ ] `startretries` - max restart attempts before aborting
-- [ ] `stopsignal` - signal to use for graceful stop (TERM, HUP, INT, etc.)
-- [ ] `stoptime` - grace period before SIGKILL
-- [ ] `stdout/stderr` - redirect to files (currently discarded)
-- [ ] `env` - environment variables
-- [ ] `workingdir` - working directory
-- [ ] `umask` - file creation mask
-
-**Features:**
-- [ ] SIGHUP signal to reload configuration
-- [ ] Proper signal handling (SIGTERM, SIGKILL for stop)
-
 **Bonus Ideas:**
 - [ ] Client/server architecture (daemon + control program)
 - [ ] Email/HTTP alerts
 - [ ] Attach/detach to process console (like tmux)
+
+### ✅ Implemented (Configuration Options)
+
+- [x] `numprocs` - number of processes to start and keep running
+- [x] `autorestart: unexpected` - restart only on unexpected exits
+- [x] `exitcodes` - expected exit status codes
+- [x] `starttime` - time before considered "successfully started"
+- [x] `startretries` - max restart attempts before aborting
+- [x] `stopsignal` - signal to use for graceful stop (TERM, HUP, INT, etc.)
+- [x] `stoptime` - grace period before SIGKILL
+- [x] `stdout/stderr` - redirect to files
+- [x] `env` - environment variables
+- [x] `workingdir` - working directory
+- [x] `umask` - file creation mask
+
+### ✅ Implemented (Signals)
+
+- [x] SIGHUP reloads configuration
+- [x] SIGTERM/SIGINT trigger graceful shutdown
 
 ## Installation
 
@@ -64,15 +66,57 @@ Edit `conf.yaml` to define your programs:
 
 ```yaml
 programs:
-  my_program:
-    cmd: "/path/to/command arg1 arg2"
+  web:
+    cmd: "python3 -m http.server 8080"
+    numprocs: 1
+    autostart: true
+    autorestart: unexpected
+    exitcodes: [0, 2]
+    starttime: 2
+    startretries: 3
+    stopsignal: TERM
+    stoptime: 10
+    stdout: "/tmp/taskmaster.web.out"
+    stderr: "/tmp/taskmaster.web.err"
+    env:
+      APP_ENV: "production"
+      PORT: "8080"
+    workingdir: "/tmp"
+    umask: "022"
+
+  worker:
+    cmd: "python3 -c 'import time; time.sleep(99999)'"
+    numprocs: 2
     autostart: true
     autorestart: true
-  
-  another_program:
-    cmd: "python3 script.py"
+    exitcodes: [0]
+    starttime: 1
+    startretries: 5
+    stopsignal: TERM
+    stoptime: 5
+    stdout: "/tmp/taskmaster.worker.out"
+    stderr: "/tmp/taskmaster.worker.err"
+    env:
+      WORKER_NAME: "alpha"
+    workingdir: "/tmp"
+    umask: "077"
+
+  scheduler:
+    cmd: "python3 -c 'import time; time.sleep(99999)'"
+    numprocs: 1
     autostart: false
     autorestart: false
+    exitcodes: [0]
+    starttime: 1
+    startretries: 0
+    stopsignal: TERM
+    stoptime: 5
+    stdout: "/tmp/taskmaster.scheduler.out"
+    stderr: "/tmp/taskmaster.scheduler.err"
+    env:
+      SCHEDULE: "*/5 * * * *"
+    workingdir: "/tmp"
+    umask: "022"
 ```
 
 ### Configuration Options
@@ -84,17 +128,17 @@ programs:
 | `cmd` | string | Command to execute | ✅ |
 | `autostart` | boolean | Start program on launch | ✅ |
 | `autorestart` | boolean | Restart when exits | ✅ |
-| `numprocs` | integer | Number of instances | ❌ |
-| `exitcodes` | list | Expected exit codes | ❌ |
-| `starttime` | integer | Seconds before "started" | ❌ |
-| `startretries` | integer | Max restart attempts | ❌ |
-| `stopsignal` | string | Signal for graceful stop | ❌ |
-| `stoptime` | integer | Grace period before KILL | ❌ |
-| `stdout` | string | Redirect stdout to file | ❌ |
-| `stderr` | string | Redirect stderr to file | ❌ |
-| `env` | dict | Environment variables | ❌ |
-| `workingdir` | string | Working directory | ❌ |
-| `umask` | string | File creation mask | ❌ |
+| `numprocs` | integer | Number of instances | ✅ |
+| `exitcodes` | list | Expected exit codes | ✅ |
+| `starttime` | integer | Seconds before "started" | ✅ |
+| `startretries` | integer | Max restart attempts | ✅ |
+| `stopsignal` | string | Signal for graceful stop | ✅ |
+| `stoptime` | integer | Grace period before KILL | ✅ |
+| `stdout` | string | Redirect stdout to file | ✅ |
+| `stderr` | string | Redirect stderr to file | ✅ |
+| `env` | dict | Environment variables | ✅ |
+| `workingdir` | string | Working directory | ✅ |
+| `umask` | string | File creation mask | ✅ |
 
 ### Target Configuration (from PDF)
 
@@ -150,8 +194,8 @@ python3 TaskMaster.py
 
   PROGRAM         STATUS               PID
   ──────────────────────────────────────────────────
-  sleeper1        ● Started            12345
-  sleeper2        ● Started            12346
+  web             ● Started            12345
+  worker          ● Started            12346
   ──────────────────────────────────────────────────
   ✓ 2 program(s) loaded
 
@@ -164,13 +208,13 @@ taskmaster> status
 ────────────────────────────────────────────────────────────
   PROGRAM         PID        STATUS       CMD
 ────────────────────────────────────────────────────────────
-  sleeper1        12345      ● RUNNING    sleep 10
-  sleeper2        12346      ● RUNNING    sleep 5
+  web             12345      ● RUNNING    python3 -m http.server 8080
+  worker          12346      ● RUNNING    python3 -c 'import time; time.sleep(99999)'
 ────────────────────────────────────────────────────────────
   Total: 2 program(s)
 
-taskmaster> stop sleeper1
-Program 'sleeper1' stopped successfully.
+taskmaster> stop web
+Program 'web' stopped successfully.
 
 taskmaster> reload
 Configuration reloaded, Nothing Changed!
@@ -184,10 +228,10 @@ Shutting down taskmaster...
 Events are logged to `logs.log`:
 
 ```
-▶ [2026-01-26 12:00:00] [sleeper1] [PID:12345] Started
-▪ [2026-01-26 12:00:10] [sleeper1] [PID:12345] Stopped
-↻ [2026-01-26 12:00:10] [sleeper1] Restarting
-▶ [2026-01-26 12:00:11] [sleeper1] [PID:12350] Started
+▶ [2026-01-26 12:00:00] [web:1] [PID:12345] Started
+▪ [2026-01-26 12:00:10] [web:1] [PID:12345] Stopped
+↻ [2026-01-26 12:00:10] [web:1] Restarting
+▶ [2026-01-26 12:00:11] [web:1] [PID:12350] Started
 ↻ [2026-01-26 12:00:15] Configuration Reloaded
 ```
 
