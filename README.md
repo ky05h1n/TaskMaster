@@ -47,7 +47,6 @@ A lightweight process manager for Linux, similar to Supervisord. TaskMaster allo
 
 **Bonus Ideas:**
 - [x] Client/server architecture (daemon + control program)
-- [x] Privilege de-escalation on launch (requires root on Unix)
 - [x] Email/HTTP/Syslog alerts (advanced logging)
 - [ ] Attach/detach to process console (like tmux)
 
@@ -62,6 +61,8 @@ pip install pyyaml
 ## Configuration
 
 Edit `conf.yaml` to define your programs:
+
+You can reference environment variables in `conf.yaml` with `${VAR}`. TaskMaster will load a local `.env` file (if present) and expand these values.
 
 ```yaml
 programs:
@@ -161,17 +162,54 @@ python3 TaskMaster.py
 
 ### Bonus: Client/Server Mode
 
+Note: SMTP/HTTP/Syslog alerts and `user`/`group` (run-as) support are available only in the bonus server (client/server mode).
+
 Run the daemon server (job control):
 
 ```bash
 python3 bonus/server.py
 ```
 
-In another terminal, run the client control shell:
+If you start the server as root, it will only drop privileges when you explicitly set `TASKMASTER_RUN_AS_USER`:
 
 ```bash
-python3 bonus/client.py
+TASKMASTER_RUN_AS_USER=youruser TASKMASTER_RUN_AS_GROUP=yourgroup sudo -E python3 bonus/server.py
 ```
+
+To keep the server running as root (required to start programs as other users):
+
+```bash
+sudo python3 bonus/server.py
+```
+
+On Unix, the bonus server uses a local Unix socket and only allows root clients. Run the client with sudo:
+
+```bash
+sudo python3 bonus/client.py
+```
+
+#### Bonus: Attach/Detach Console
+
+To allow attaching to a program console, set `console: true` on the program:
+
+```yaml
+programs:
+  run_as_nobody:
+    cmd: "sleep 60"
+    autostart: false
+    autorestart: false
+    user: "nobody"
+    group: "nogroup"
+    console: true
+```
+
+Then attach from the client:
+
+```text
+attach run_as_nobody
+```
+
+Detach with `Ctrl-]` and the process continues in the background.
 
 ### Available Commands
 
@@ -184,6 +222,24 @@ python3 bonus/client.py
 | `restart <program>` | Restart a specific program |
 | `reload` | Reload configuration file |
 | `quit` / `exit` | Exit TaskMaster |
+
+### Bonus: Web Dashboard
+
+Run the daemon first, then the web dashboard:
+
+```bash
+pip install -r requirements.txt
+sudo python3 bonus/server.py
+python3 bonus/web_dashboard.py
+```
+
+Then open:
+
+```
+http://localhost:8000
+```
+
+The dashboard shows live status, CPU/memory, and allows start/stop/restart by talking to the daemon socket.
 
 ### Example Session
 
